@@ -209,7 +209,7 @@ However, all core architectural decisions, data modeling, feature engineering, p
   title={Banking Transaction Data Pipeline – Production-Grade AWS ETL with Real-time Dashboard},
   author={Khanongsuwan, Paradorn},
   year={2026},
-  howpublished={\url{https://github.com/yourusername/banking-pipeline}}
+  howpublished={\url{https://github.com/iHazelly/Banking-Transaction-Data-Pipeline-}}
 }
 ```
 
@@ -225,8 +225,7 @@ However, all core architectural decisions, data modeling, feature engineering, p
 ---
 ## 📬 Contact
 
-- **GitHub**: github.com/yourusername
-- **LinkedIn**: linkedin.com/in/yourprofile
+- **GitHub**: github.com/iHazelly
 
 Feel free to open an issue or pull request for improvements!
 
