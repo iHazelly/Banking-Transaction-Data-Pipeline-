@@ -148,20 +148,6 @@ aws s3 cp dataset/sample_10k.csv s3://banking-raw-<your-suffix>/incoming/
 - Upload `dashboard/index.html` to the bucket root
 - Open the website URL — dashboard shows live data once Glue job produces `data/summary.json`
 
----
-## 📸 Screenshots
-
-| # | Screenshot | Location |
-|---|---|---|
-| 1 | Architecture Diagram | `docs/architecture.png` |
-| 2 | Live Dashboard | S3 website endpoint |
-| 3 | Glue ETL Job Log (success) | Glue Console → Jobs → Runs → CloudWatch |
-| 4 | Athena Query Result | Athena Console → query editor |
-| 5 | S3 Processed Parquet Files | `banking-processed-.../transactions/year=2026/...` |
-| 6 | SNS Email Notification | Email inbox (blur address) |
-| 7 | CloudFormation Stack Resources | CloudFormation → Stack → Resources tab |
-| 8 | Step Functions Execution Graph | Step Functions → State machine → Execution |
-| 9 | JSON Summary File | Dashboard bucket → `data/summary.json` |
 
 ---
 
