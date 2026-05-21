@@ -42,7 +42,7 @@ Banks process millions of transactions daily. Traditional batch jobs run at midn
 | **Monitoring** | CloudWatch + SNS | Logging, metrics, email alerts on success/failure |
 | **Visualization** | S3 Static Website (ApexCharts) | Interactive dashboard with auto‑refresh |
 
-
+> **Cost**: Fully serverless – runs under **$0.50 per month** on AWS Free Tier / Learner Lab credit
 
 ---
 
@@ -108,4 +108,3 @@ Banks process millions of transactions daily. Traditional batch jobs run at midn
    git clone https://github.com/yourusername/banking-pipeline.git
    cd banking-pipeline
 
-> **Cost**: Fully serverless – runs under **$0.50 per month** on AWS Free Tier / Learner Lab credit
