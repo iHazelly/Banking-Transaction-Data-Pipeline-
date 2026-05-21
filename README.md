@@ -103,8 +103,49 @@ Banks process millions of transactions daily. Traditional batch jobs run at midn
 
 ### Steps
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/banking-pipeline.git
-   cd banking-pipeline
+**1. Clone the repository**
 
+```bash
+git clone https://github.com/yourusername/banking-pipeline.git
+cd banking-pipeline
+```
+
+**2. Upload the Glue script to S3**
+
+```bash
+aws s3 cp glue/banking_etl_job.py s3://banking-raw-<your-suffix>/scripts/
+```
+
+**3. Deploy the CloudFormation stack**
+
+- Go to AWS Console → CloudFormation → Create stack → Upload a template file → select `cloudformation/banking-pipeline-iac.yaml`
+- Provide parameters:
+  - `EnvironmentName`: `dev`
+  - `BucketSuffix`: a unique suffix (e.g., `yourname-2026`)
+  - `EmailAddress`: your email (to receive alerts)
+  - `GlueScriptS3Key`: `scripts/banking_etl_job.py`
+- Acknowledge IAM capabilities → Create stack
+- Wait for `CREATE_COMPLETE` (~2-3 minutes)
+
+**4. Upload test data**
+
+Upload `dataset/sample_10k.csv` to your raw bucket:
+
+```bash
+aws s3 cp dataset/sample_10k.csv s3://banking-raw-<your-suffix>/incoming/
+```
+
+**5. Monitor the pipeline**
+
+- Step Functions Console → watch execution graph
+- Glue Console → Jobs → view run logs
+- Check email for success/failure notification
+
+**6. Enable Dashboard**
+
+- Go to S3 Console → `banking-dashboard-<your-suffix>` bucket
+- Properties → Static website hosting → Enable → Index document: `index.html`
+- Upload `dashboard/index.html` to the bucket root
+- Open the website URL — dashboard shows live data once Glue job produces `data/summary.json`
+
+---
