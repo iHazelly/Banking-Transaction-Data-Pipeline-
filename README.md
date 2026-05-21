@@ -42,4 +42,70 @@ Banks process millions of transactions daily. Traditional batch jobs run at midn
 | **Monitoring** | CloudWatch + SNS | Logging, metrics, email alerts on success/failure |
 | **Visualization** | S3 Static Website (ApexCharts) | Interactive dashboard with auto‑refresh |
 
+
+
+---
+
+## 🛠️ Technologies & Services Used
+
+| Category | Tools / Services |
+|----------|------------------|
+| **Cloud** | AWS (S3, Glue, Athena, Step Functions, EventBridge, SNS, CloudWatch, IAM) |
+| **Data Processing** | PySpark (AWS Glue 4.0), Parquet, Snappy compression |
+| **Query Engine** | Amazon Athena (Presto) |
+| **Orchestration** | Step Functions, EventBridge |
+| **Monitoring & Alerting** | CloudWatch, SNS (email) |
+| **Visualization** | HTML, Tailwind CSS, ApexCharts.js |
+| **Infrastructure as Code** | AWS CloudFormation |
+| **Version Control** | Git, GitHub |
+
+---
+
+## 📊 Dataset
+
+- **Source**: [PaySim Financial Dataset](https://www.kaggle.com/datasets/ealaxi/paysim1) (Kaggle)
+- **Rows**: 6.3M (sample used: 10k for testing)
+- **Key columns**: `step` (time), `type` (TRANSFER, CASH_OUT, etc.), `amount`, `nameOrig`, `nameDest`, `oldbalanceOrg`, `newbalanceOrig`, `isFraud`
+- **Fraud distribution**: Only `TRANSFER` and `CASH_OUT` contain fraudulent transactions.
+
+---
+
+## 🧠 What the Pipeline Does (Step‑by‑Step)
+
+1. **File Upload** → CSV file dropped into `s3://banking-raw-.../incoming/`
+2. **EventBridge** → Detects S3 `PutObject` event and triggers Step Functions.
+3. **Step Functions** → Orchestrates:  
+   - Run Glue Crawler (schema update)  
+   - Run Glue ETL job (transform & load)  
+   - Run `MSCK REPAIR TABLE` in Athena  
+   - Send success/failure email via SNS
+4. **Glue ETL (PySpark)** does:
+   - Data quality checks (nulls, amount>0, valid types, balance consistency)
+   - Enrichment (account type, suspicious flags, time features)
+   - Write data as **Parquet** partitioned by `year/month/day/type`
+   - Log **data lineage** (JSON) to S3 lineage bucket
+   - Export **summary JSON** to dashboard bucket (`data/summary.json`)
+5. **Athena** → External table on the Parquet location, ready for SQL queries.
+6. **Static Dashboard** (S3 website) → Fetches `summary.json` and renders:
+   - KPI cards (total transactions, fraud cases, fraud rate, total volume)
+   - Bar chart (fraud by transaction type)
+   - Pie chart (transaction volume share)
+   - Sparklines for trends
+   - Last updated timestamp
+
+---
+
+## 🚀 Deployment Instructions (CloudFormation)
+
+### Prerequisites
+- AWS account with permissions (or AWS Learner Lab).
+- AWS CLI installed (optional, you can use Console).
+
+### Steps
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/banking-pipeline.git
+   cd banking-pipeline
+
 > **Cost**: Fully serverless – runs under **$0.50 per month** on AWS Free Tier / Learner Lab credit
