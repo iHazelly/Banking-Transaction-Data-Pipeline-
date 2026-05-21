@@ -27,7 +27,8 @@ Banks process millions of transactions daily. Traditional batch jobs run at midn
 
 ## 🏗️ Architecture Overview
 
-![Architecture Diagram](docs/architecture.png)
+<img width="1362" height="652" alt="architecture" src="https://github.com/user-attachments/assets/4c88d3fa-1807-4520-b3d0-8876bc3af657" />
+
 
 *High‑level architecture – event‑driven pipeline using AWS services.*
 
