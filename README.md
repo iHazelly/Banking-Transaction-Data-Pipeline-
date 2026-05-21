@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/Python-3.9-blue)
 ![Dashboard](https://img.shields.io/badge/Dashboard-ApexCharts.js-brightgreen)
 ![IaC](https://img.shields.io/badge/IaC-CloudFormation-yellow)
-![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
 
 An **event‑driven, end‑to‑end data pipeline** that simulates a real‑world banking fraud detection system.  
 It ingests transaction data (PaySim), performs data quality checks, transforms and partitions data using **AWS Glue (PySpark)**, stores it as **Parquet**, makes it queryable via **Amazon Athena**, and visualizes key metrics through an **interactive static dashboard** – all automated and serverless.
