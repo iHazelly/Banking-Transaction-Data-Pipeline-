@@ -1,0 +1,134 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: S3 buckets for Banking Transaction Pipeline
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: "dev"
+  BucketSuffix:
+    Type: String
+    Default: "hazell-bank-transaction-2026"
+
+Resources:
+  # 1. RAW BUCKET
+  BankingRawBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "banking-raw-${BucketSuffix}"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # 2. PROCESSED BUCKET
+  BankingProcessedBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "banking-processed-${BucketSuffix}"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # 3. ATHENA BUCKET
+  BankingAthenaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "banking-athena-${BucketSuffix}"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # 4. LINEAGE BUCKET
+  BankingLineageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "banking-lineage-${BucketSuffix}"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # 5. DASHBOARD BUCKET (มี Website Config + Bucket Policy)
+  BankingDashboardBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "banking-dashboard-${BucketSuffix}"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: false
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: false
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+
+  # Bucket Policy ให้ Dashboard Bucket อ่านได้แบบ Public (สำหรับ Static Website)
+  BankingDashboardBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BankingDashboardBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Sub "${BankingDashboardBucket.Arn}/*"
+
+Outputs:
+  RawBucketName:
+    Description: Raw data bucket name
+    Value: !Ref BankingRawBucket
+  ProcessedBucketName:
+    Description: Processed data bucket name
+    Value: !Ref BankingProcessedBucket
+  AthenaBucketName:
+    Description: Athena results bucket name
+    Value: !Ref BankingAthenaBucket
+  LineageBucketName:
+    Description: Lineage audit bucket name
+    Value: !Ref BankingLineageBucket
+  DashboardBucketName:
+    Description: Static website bucket name
+    Value: !Ref BankingDashboardBucket
+  DashboardURL:
+    Description: URL for static website
+    Value: !GetAtt BankingDashboardBucket.WebsiteURL

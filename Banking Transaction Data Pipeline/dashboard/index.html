@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Banking Fraud Dashboard | Real‑time Monitor</title>
+  <!-- Google Fonts: Inter + Tailwind CSS CDN -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- ApexCharts CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <!-- Font Awesome 6 (free icons) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #f0f4f8; }
+    .card { background: white; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.05); transition: all 0.2s ease; }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -12px rgba(0,0,0,0.1); }
+    .kpi-icon { width: 48px; height: 48px; background: #eff6ff; border-radius: 30px; display: flex; align-items: center; justify-content: center; color: #2563eb; }
+    .sparkline-container { height: 40px; width: 100px; }
+    .footer-text { color: #4b5563; font-size: 0.75rem; border-top: 1px solid #e2e8f0; padding-top: 1.5rem; margin-top: 2rem; }
+  </style>
+</head>
+<body class="antialiased">
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+  <!-- Header -->
+  <div class="mb-8 flex flex-wrap justify-between items-end border-b border-gray-200 pb-4">
+    <div>
+      <h1 class="text-3xl font-bold tracking-tight text-gray-900">🏦 Banking Fraud Dashboard</h1>
+      <p class="text-gray-500 mt-1">Real‑time fraud monitoring · Live pipeline insights</p>
+    </div>
+    <div class="mt-2 sm:mt-0">
+      <span class="inline-flex items-center gap-2 bg-white/70 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium text-gray-600 shadow-sm">
+        <i class="fas fa-sync-alt text-blue-500 text-xs"></i>
+        Auto‑updates via ETL pipeline
+      </span>
+    </div>
+  </div>
+
+  <!-- KPI Cards Grid (4 cards) -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8" id="kpi-container">
+    <!-- เนื้อหาจะถูกสร้างโดย JS -->
+  </div>
+
+  <!-- Charts Row: Bar (Fraud by Type) + Pie (Transaction Share) -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-800"><i class="fas fa-chart-simple text-blue-500 mr-2"></i>Fraud by Transaction Type</h2>
+        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">count of fraud cases</span>
+      </div>
+      <div id="bar-chart" class="h-80"></div>
+    </div>
+    <div class="card p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-gray-800"><i class="fas fa-chart-pie text-blue-500 mr-2"></i>Transaction Volume Share</h2>
+        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">by total amount (USD)</span>
+      </div>
+      <div id="pie-chart" class="h-80"></div>
+    </div>
+  </div>
+
+  <!-- Footer / last updated -->
+  <div class="footer-text text-center flex justify-between items-center flex-wrap gap-2">
+    <span><i class="far fa-clock mr-1"></i> Last data sync: <span id="last-updated">—</span></span>
+    <span><i class="fas fa-database mr-1"></i> Powered by AWS Glue · Parquet · Athena</span>
+  </div>
+</div>
+
+<script>
+  // --------------------------------------------------------------
+  // 1. กำหนด PATH ของ JSON (relative path กับ index.html)
+  // --------------------------------------------------------------
+  const JSON_URL = './data/summary.json';   // สมมติว่า index.html อยู่ root และ data/summary.json อยู่ folder data
+
+  // --------------------------------------------------------------
+  // 2. ตัวแปรเก็บ instance ของ ApexCharts
+  // --------------------------------------------------------------
+  let barChart, pieChart;
+
+  // --------------------------------------------------------------
+  // 3. ฟังก์ชันแสดง Loading / Error
+  // --------------------------------------------------------------
+  function showLoading(show = true) {
+    const container = document.getElementById('kpi-container');
+    if (show) {
+      container.innerHTML = `<div class="col-span-full text-center py-10 text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i> Loading dashboard data...</div>`;
+    }
+  }
+
+  function showError(msg) {
+    const container = document.getElementById('kpi-container');
+    container.innerHTML = `<div class="col-span-full bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl"><i class="fas fa-exclamation-triangle mr-2"></i> ${msg}</div>`;
+    console.error(msg);
+  }
+
+  // --------------------------------------------------------------
+  // 4. สร้าง KPI Cards + Mini Sparkline (ใช้ ApexCharts แบบ tiny)
+  // --------------------------------------------------------------
+  function renderKPIs(data) {
+    const summary = data.summary;
+    const byType = data.by_type;
+    const container = document.getElementById('kpi-container');
+    if (!summary) return;
+
+    // คำนวณ fraud rate %
+    const fraudRate = ((summary.total_fraud / summary.total_transactions) * 100).toFixed(2);
+
+    // กำหนด formatter ตัวเลข
+    const formatNumber = (num) => new Intl.NumberFormat().format(num);
+    const formatCurrency = (num) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
+
+    // เตรียม sparkline data (ตัวอย่างใช้ hourly fraud หรือ trend ง่ายๆ ใช้ 7 จุดสมมติ)
+    // แต่เราจะใช้ hourly_fraud ที่มีจริง (ถ้ามี) หรือไม่ก็ใช้ 2 ค่า (fraud ต่อ type)
+    let sparkData = [];
+    if (data.hourly_fraud && data.hourly_fraud.length > 0) {
+      sparkData = data.hourly_fraud.map(h => h.fraud);
+    } else {
+      sparkData = byType.map(t => t.fraud);
+    }
+
+    const cardData = [
+      { title: 'Total Transactions', value: formatNumber(summary.total_transactions), icon: 'fas fa-exchange-alt', bgIcon: '#e0f2fe', color: '#0284c7', sparkData: sparkData.slice(0,6) },
+      { title: 'Fraud Cases', value: formatNumber(summary.total_fraud), icon: 'fas fa-shield-alt', bgIcon: '#fee2e2', color: '#dc2626', sparkData: sparkData.slice(0,6) },
+      { title: 'Fraud Rate', value: `${fraudRate}%`, icon: 'fas fa-percent', bgIcon: '#fef9c3', color: '#ca8a04', sparkData: sparkData.slice(0,6) },
+      { title: 'Total Volume', value: formatCurrency(summary.total_volume_usd), icon: 'fas fa-dollar-sign', bgIcon: '#dcfce7', color: '#16a34a', sparkData: sparkData.slice(0,6) },
+    ];
+
+    container.innerHTML = '';
+    cardData.forEach((card, idx) => {
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'card p-5 transition-all';
+      cardDiv.innerHTML = `
+        <div class="flex items-start justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-500 mb-1">${card.title}</p>
+            <p class="text-2xl font-bold text-gray-900 tracking-tight">${card.value}</p>
+          </div>
+          <div class="kpi-icon" style="background: ${card.bgIcon}30; color: ${card.color};">
+            <i class="${card.icon} text-xl"></i>
+          </div>
+        </div>
+        <div class="mt-3 sparkline-container" id="spark-${idx}"></div>
+      `;
+      container.appendChild(cardDiv);
+
+      // render mini sparkline โดยใช้ ApexCharts (เปลี่ยนเป็น line chart ขนาดเล็ก)
+      const sparkOptions = {
+        series: [{ name: 'trend', data: card.sparkData }],
+        chart: { type: 'area', height: 36, width: '100%', sparkline: { enabled: true }, toolbar: { show: false }, animations: { enabled: false } },
+        stroke: { curve: 'smooth', width: 1.5, colors: [card.color] },
+        fill: { opacity: 0.2, colors: [card.color] },
+        tooltip: { enabled: false },
+        xaxis: { labels: { show: false } },
+        yaxis: { labels: { show: false } },
+        grid: { show: false },
+      };
+      const sparkChart = new ApexCharts(document.querySelector(`#spark-${idx}`), sparkOptions);
+      sparkChart.render();
+    });
+  }
+
+  // --------------------------------------------------------------
+  // 5. render Bar Chart (Fraud by Type)
+  // --------------------------------------------------------------
+  function renderBarChart(byType) {
+    const categories = byType.map(t => t.type);
+    const fraudCounts = byType.map(t => t.fraud);
+    const options = {
+      series: [{ name: 'Fraud Cases', data: fraudCounts }],
+      chart: { type: 'bar', height: 300, toolbar: { show: false }, background: 'transparent', fontFamily: 'Inter' },
+      colors: ['#3b82f6'],
+      plotOptions: { bar: { borderRadius: 8, horizontal: false, columnWidth: '55%', distributed: false, dataLabels: { position: 'top' } } },
+      dataLabels: { enabled: true, offsetY: -10, style: { fontSize: '12px', colors: ['#1e293b'] } },
+      xaxis: { categories, labels: { style: { fontSize: '12px', fontWeight: 500 } } },
+      yaxis: { title: { text: 'Number of Fraudulent Transactions', style: { fontSize: '12px' } } },
+      grid: { borderColor: '#eef2f6', strokeDashArray: 4 },
+      tooltip: { theme: 'light', y: { formatter: (val) => `${val} fraud cases` } },
+    };
+    if (barChart) barChart.destroy();
+    barChart = new ApexCharts(document.querySelector("#bar-chart"), options);
+    barChart.render();
+  }
+
+  // --------------------------------------------------------------
+  // 6. render Pie Chart (Transaction Volume Share)
+  // --------------------------------------------------------------
+  function renderPieChart(byType) {
+    const labels = byType.map(t => t.type);
+    const seriesData = byType.map(t => t.total_amount);
+    const options = {
+      series: seriesData,
+      chart: { type: 'donut', height: 300, fontFamily: 'Inter', toolbar: { show: false } },
+      labels: labels,
+      colors: ['#3b82f6', '#f97316', '#10b981', '#8b5cf6', '#ef4444'],
+      legend: { position: 'bottom', fontSize: '12px', markers: { radius: 8 } },
+      dataLabels: { enabled: true, formatter: (val, opts) => `${opts.w.config.series[opts.seriesIndex]} USD`, style: { fontSize: '11px' } },
+      tooltip: { y: { formatter: (val) => `$${val.toLocaleString()}` } },
+      plotOptions: { pie: { expandOnClick: true, donut: { size: '55%', labels: { show: true, name: { fontSize: '14px' }, value: { fontSize: '14px', formatter: (val) => `$${Number(val).toLocaleString()}` }, total: { show: true, label: 'Total', formatter: (w) => `$${w.globals.seriesTotals.reduce((a,b)=>a+b,0).toLocaleString()}` } } } } }
+    };
+    if (pieChart) pieChart.destroy();
+    pieChart = new ApexCharts(document.querySelector("#pie-chart"), options);
+    pieChart.render();
+  }
+
+  // --------------------------------------------------------------
+  // 7. Main fetch + render
+  // --------------------------------------------------------------
+  async function loadDashboard() {
+    showLoading(true);
+    try {
+      const response = await fetch(JSON_URL);
+      if (!response.ok) throw new Error(`HTTP ${response.status}: Unable to fetch summary.json`);
+      const data = await response.json();
+      if (!data.summary || !data.by_type) throw new Error('Invalid JSON structure: missing summary or by_type');
+      
+      // อัปเดต last updated
+      document.getElementById('last-updated').innerText = data.last_updated ? new Date(data.last_updated).toLocaleString() : new Date().toLocaleString();
+      
+      // render ทั้งหมด
+      renderKPIs(data);
+      renderBarChart(data.by_type);
+      renderPieChart(data.by_type);
+    } catch (err) {
+      console.error(err);
+      showError(`Failed to load dashboard data: ${err.message}. Ensure summary.json exists in /data/ and CORS is properly configured.`);
+    } finally {
+      // no explicit hide loading because cards already replaced
+    }
+  }
+
+  // โหลดเมื่อ DOM พร้อม
+  document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+</body>
+</html>

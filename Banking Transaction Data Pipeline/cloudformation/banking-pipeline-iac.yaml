@@ -1,0 +1,188 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Banking Pipeline - Glue + Step Functions (no IAM roles)
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: "dev"
+  BucketSuffix:
+    Type: String
+    Default: "hazell-bank-transaction-2026"
+  EmailAddress:
+    Type: String
+  GlueScriptS3Key:
+    Type: String
+    Default: "scripts/banking_etl_job.py"
+
+Resources:
+  # GLUE DATABASE
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref "AWS::AccountId"
+      DatabaseInput:
+        Name: !Sub "banking_db_${EnvironmentName}"
+
+  # GLUE CRAWLER
+  GlueCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Role: arn:aws:iam::980872845129:role/LabRole
+      DatabaseName: !Ref GlueDatabase
+      Targets:
+        S3Targets:
+          - Path: !Sub "s3://banking-raw-${BucketSuffix}/incoming/"
+      Schedule:
+        ScheduleExpression: "cron(0 0/1 * * ? *)"
+      SchemaChangePolicy:
+        UpdateBehavior: "UPDATE_IN_DATABASE"
+        DeleteBehavior: "DEPRECATE_IN_DATABASE"
+
+  # GLUE ETL JOB
+  GlueETLJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Role: arn:aws:iam::980872845129:role/LabRole
+      GlueVersion: "4.0"
+      NumberOfWorkers: 2
+      WorkerType: "G.1X"
+      Timeout: 60
+      Command:
+        Name: "glueetl"
+        ScriptLocation: !Sub "s3://banking-raw-${BucketSuffix}/${GlueScriptS3Key}"
+        PythonVersion: "3"
+      DefaultArguments:
+        "--INPUT_PATH": !Sub "s3://banking-raw-${BucketSuffix}/incoming/"
+        "--OUTPUT_PATH": !Sub "s3://banking-processed-${BucketSuffix}/transactions/"
+        "--LINEAGE_PATH": !Sub "s3://banking-lineage-${BucketSuffix}/"
+        "--SNS_TOPIC_ARN": !Ref SNSTopic
+        "--enable-spark-ui": "true"
+
+  # SNS TOPIC
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "banking-pipeline-alerts-${EnvironmentName}"
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref EmailAddress
+
+  # STEP FUNCTIONS STATE MACHINE
+  StateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      RoleArn: arn:aws:iam::980872845129:role/LabRole
+      DefinitionString: !Sub |
+        {
+          "Comment": "Banking Transaction ETL Pipeline",
+          "StartAt": "StartGlueCrawler",
+          "States": {
+            "StartGlueCrawler": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+              "Parameters": {"Name": "${GlueCrawler}"},
+              "Next": "WaitForCrawler",
+              "Catch": [{"ErrorEquals": ["Glue.CrawlerRunningException"], "Next": "WaitForCrawler"}]
+            },
+            "WaitForCrawler": {
+              "Type": "Wait", "Seconds": 60, "Next": "CheckCrawlerStatus"
+            },
+            "CheckCrawlerStatus": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+              "Parameters": {"Name": "${GlueCrawler}"},
+              "Next": "IsCrawlerDone"
+            },
+            "IsCrawlerDone": {
+              "Type": "Choice",
+              "Choices": [{"Variable": "$.Crawler.State", "StringEquals": "READY", "Next": "StartGlueETL"}],
+              "Default": "WaitForCrawler"
+            },
+            "StartGlueETL": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync",
+              "Parameters": {"JobName": "${GlueETLJob}"},
+              "Next": "RunAthenaRepair",
+              "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "PipelineFailed"}],
+              "Retry": [{"ErrorEquals": ["States.TaskFailed"], "IntervalSeconds": 30, "MaxAttempts": 2}]
+            },
+            "RunAthenaRepair": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+              "Parameters": {
+                "QueryString": "MSCK REPAIR TABLE banking_db.transactions_processed",
+                "WorkGroup": "primary",
+                "ResultConfiguration": {"OutputLocation": "s3://banking-athena-${BucketSuffix}/step-functions/"}
+              },
+              "Next": "PipelineSucceeded",
+              "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "PipelineSucceeded"}]
+            },
+            "PipelineSucceeded": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sns:publish",
+              "Parameters": {
+                "TopicArn": "${SNSTopic}",
+                "Subject": "✅ Banking Pipeline SUCCESS",
+                "Message.$": "States.Format('Pipeline completed successfully! Run: {}', $.run_id)"
+              },
+              "End": true
+            },
+            "PipelineFailed": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sns:publish",
+              "Parameters": {
+                "TopicArn": "${SNSTopic}",
+                "Subject": "❌ Banking Pipeline FAILED",
+                "Message.$": "States.Format('Pipeline failed! Run: {}', $.run_id)"
+              },
+              "End": true
+            }
+          }
+        }
+
+  # ========== EVENTBRIDGE RULE (Simplified) ==========
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "s3-put-trigger-${EnvironmentName}"
+      EventPattern:
+        source:
+          - "aws.s3"
+        detail-type:
+          - "AWS API Call via CloudTrail"
+        detail:
+          eventSource:
+            - "s3.amazonaws.com"
+          eventName:
+            - "PutObject"
+          requestParameters:
+            bucketName:
+              - !Sub "banking-raw-${BucketSuffix}"
+      Targets:
+        - Arn: !Ref StateMachine
+          Id: "StepFunctionsTarget"
+          RoleArn: arn:aws:iam::980872845129:role/LabRole
+          InputTransformer:
+            InputPathsMap:
+              bucket: "$.detail.requestParameters.bucketName"
+              key: "$.detail.requestParameters.key"
+            InputTemplate: |
+              {
+                "run_id": "event-<aws:event-id>",
+                "input_path": "s3://<bucket>/<key>",
+                "triggered_at": "<aws:event-time>"
+              }
+
+Outputs:
+  GlueDatabaseName:
+    Value: !Ref GlueDatabase
+  GlueCrawlerName:
+    Value: !Ref GlueCrawler
+  GlueETLJobName:
+    Value: !Ref GlueETLJob
+  StateMachineArn:
+    Value: !Ref StateMachine
+  SNSTopicArn:
+    Value: !Ref SNSTopic
