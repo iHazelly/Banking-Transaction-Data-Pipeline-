@@ -149,3 +149,104 @@ aws s3 cp dataset/sample_10k.csv s3://banking-raw-<your-suffix>/incoming/
 - Open the website URL — dashboard shows live data once Glue job produces `data/summary.json`
 
 ---
+## 📸 Screenshots
+
+| # | Screenshot | Location |
+|---|---|---|
+| 1 | Architecture Diagram | `docs/architecture.png` |
+| 2 | Live Dashboard | S3 website endpoint |
+| 3 | Glue ETL Job Log (success) | Glue Console → Jobs → Runs → CloudWatch |
+| 4 | Athena Query Result | Athena Console → query editor |
+| 5 | S3 Processed Parquet Files | `banking-processed-.../transactions/year=2026/...` |
+| 6 | SNS Email Notification | Email inbox (blur address) |
+| 7 | CloudFormation Stack Resources | CloudFormation → Stack → Resources tab |
+| 8 | Step Functions Execution Graph | Step Functions → State machine → Execution |
+| 9 | JSON Summary File | Dashboard bucket → `data/summary.json` |
+
+---
+
+## 🔐 Security & Cost Optimization
+
+- **Encryption**: SSE-S3 enabled on all buckets
+- **Public Access**: All buckets have public access blocked, except dashboard bucket (static website)
+- **IAM**: Least-privilege roles (LabRole used in this implementation)
+- **Partitioning**: Data partitioned by `year/month/day/type` → reduces Athena scan cost significantly
+- **Lifecycle Policies**: Processed data moves to `STANDARD_IA` after 30 days, expires after 365 days
+- **Cost**: Total pipeline cost < $5 for full development and testing (AWS Learner Lab $40 credits)
+
+---
+
+## 🧠 Skills Demonstrated
+
+| Skill | Evidence |
+|---|---|
+| Data Pipeline (ETL/ELT) | Glue PySpark script — extract, transform, load |
+| Data Quality | Null checks, range validation, business rule validation |
+| Data Lineage | JSON logging of source, transformations, target |
+| Partitioning & Columnar Format | Parquet + Snappy, Hive-style partitioning |
+| Serverless Orchestration | Step Functions + Lambda event trigger |
+| Monitoring & Alerting | CloudWatch logs + SNS email alerts |
+| Data Lake & Querying | Athena external tables on S3 |
+| Dashboard & Visualization | HTML + ApexCharts, S3 static hosting |
+| Infrastructure as Code | CloudFormation (YAML) |
+| Security & Cost Awareness | Bucket policies, encryption, lifecycle rules |
+
+---
+
+## 🔮 Future Improvements
+
+- **Real-time streaming** — replace batch with Amazon Kinesis + Lambda for near-instant fraud detection
+- **Advanced data quality** — integrate Great Expectations or Deequ for automated DQ reporting
+- **ML integration** — use SageMaker to predict fraud probability and surface in dashboard
+- **CI/CD pipeline** — automate deployment with GitHub Actions
+- **Graph analytics** — Neo4j for circular transfer ring detection (money laundering patterns)
+
+---
+
+## 🤖 AI Use Declaration
+
+During the development of this project, AI tools were used for:
+
+- Language translation and sentence refinement
+- Code suggestions, debugging, and structural guidance
+- Writing assistance for the README and documentation
+- Brainstorming and conceptual support
+
+However, all core architectural decisions, data modeling, feature engineering, pipeline configuration, result interpretation, and final technical validations were performed by the author (Paradorn Khanongsuwan). All AI-generated outputs have been manually verified and adapted.
+
+---
+
+## 📜 Citation
+
+```bibtex
+@misc{khanongsuwan_2026_banking_pipeline,
+  title={Banking Transaction Data Pipeline – Production-Grade AWS ETL with Real-time Dashboard},
+  author={Khanongsuwan, Paradorn},
+  year={2026},
+  howpublished={\url{https://github.com/yourusername/banking-pipeline}}
+}
+```
+
+---
+
+## 🙏 Acknowledgements
+
+- **Dataset**: [PaySim Financial Dataset](https://www.kaggle.com/datasets/ealaxi/paysim1) (Kaggle)
+- **AWS Learner Lab** — cloud credits for hands-on learning
+- **Asian Institute of Technology (AIT)** — academic guidance
+- **Open-source libraries**: Apache Spark, boto3, ApexCharts, Tailwind CSS
+
+---
+## 📬 Contact
+
+- **GitHub**: github.com/yourusername
+- **LinkedIn**: linkedin.com/in/yourprofile
+
+Feel free to open an issue or pull request for improvements!
+
+---
+
+## ✅ Summary
+
+This project is a complete, production-grade data pipeline showcasing every stage of modern data engineering — from ingestion to visualization — on AWS. Designed to be reproducible, cost-efficient, and portfolio-ready. Perfect for demonstrating skills required for **Data Engineer**, **Analytics Engineer**, or **Data Platform Engineer** roles, especially in the banking and finance domain.
+
