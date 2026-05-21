@@ -1,3 +1,4 @@
+
 # 🏦 Banking Transaction Data Pipeline — AWS Production Grade
 
 ![AWS](https://img.shields.io/badge/AWS-Glue%20%7C%20Athena%20%7C%20S3%20%7C%20Step%20Functions%20%7C%20EventBridge%20%7C%20SNS-orange)
@@ -9,6 +10,7 @@
 
 An **event‑driven, end‑to‑end data pipeline** that simulates a real‑world banking fraud detection system.  
 It ingests transaction data (PaySim), performs data quality checks, transforms and partitions data using **AWS Glue (PySpark)**, stores it as **Parquet**, makes it queryable via **Amazon Athena**, and visualizes key metrics through an **interactive static dashboard** – all automated and serverless.
+<img width="1379" height="821" alt="dashboard" src="https://github.com/user-attachments/assets/35c03340-1f26-4e47-8ed4-d9fb259a74b1" />
 
 ---
 
